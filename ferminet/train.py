@@ -37,6 +37,9 @@ from ferminet.utils import statistics
 from ferminet.utils import system
 from ferminet.utils import utils
 from ferminet.utils import writers
+import ferminet.pbc.hamiltonian as pbc_hamiltonian
+import ferminet.pbc.envelopes as pbc_envelopes
+import ferminet.pbc.feature_layer as pbc_feature_layer
 import jax
 from jax.experimental import multihost_utils
 import jax.numpy as jnp
@@ -468,12 +471,25 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
         nspins=cfg.system.particles,
         ndim=cfg.system.ndim,
         **cfg.network.make_feature_layer_kwargs)
-  else:
+  elif not cfg.system.pbc.apply_pbc:
     feature_layer = networks.make_ferminet_features(
         natoms=charges.shape[0],
         nspins=cfg.system.particles,
         ndim=cfg.system.ndim,
         rescale_inputs=cfg.network.get('rescale_inputs', False),
+    )
+  else:
+    if len(cfg.system.molecule) == 1 and cfg.system.molecule[0].charge == 0:
+      include_r_ae = False
+    else:
+      include_r_ae = True
+    feature_layer = pbc_feature_layer.make_pbc_feature_layer(
+        natoms=charges.shape[0],
+        nspins=cfg.system.particles,
+        ndim=cfg.system.ndim,
+        rescale_inputs=cfg.network.get('rescale_inputs', False),
+        lattice=cfg.system.pbc.lattice_vectors,
+        include_r_ae=include_r_ae
     )
 
   if cfg.network.make_envelope_fn:
@@ -482,8 +498,15 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
     envelope_module = importlib.import_module(envelope_module)
     make_envelope = getattr(envelope_module, envelope_fn)
     envelope = make_envelope(**cfg.network.make_envelope_kwargs)  # type: envelopes.Envelope
-  else:
+  elif not cfg.system.pbc.apply_pbc:
     envelope = envelopes.make_isotropic_envelope()
+  else:
+    kpoints = pbc_envelopes.make_kpoints(
+      cfg.system.pbc.lattice_vectors,
+      cfg.system.particles,
+      cfg.system.pbc.min_kpoints
+    )
+    envelope = pbc_envelopes.make_multiwave_envelope(kpoints)
 
   use_complex = cfg.network.get('complex', False)
   if cfg.network.network_type == 'ferminet':
@@ -739,7 +762,7 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
         use_scan=False,
         states=cfg.system.get('states', 0),
         **cfg.system.make_local_energy_kwargs)
-  else:
+  elif not cfg.system.pbc.apply_pbc:
     pp_symbols = cfg.system.get('pp', {'symbols': None}).get('symbols')
     local_energy_fn = hamiltonian.local_energy(
         f=signed_network,
@@ -755,6 +778,24 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
         state_specific=(cfg.optim.objective == 'vmc_overlap'),
         pp_type=cfg.system.get('pp', {'type': 'ccecp'}).get('type'),
         pp_symbols=pp_symbols if cfg.system.get('use_pp') else None)
+  else:
+    pp_symbols = cfg.system.get('pp', {'symbols': None}).get('symbols')
+    local_energy_fn = pbc_hamiltonian.local_energy(
+        f=signed_network,
+        charges=charges,
+        nspins=nspins,
+        ndim=cfg.system.ndim,
+        particle_charges=cfg.system.charges,
+        particle_masses=cfg.system.masses,
+        use_scan=False,
+        complex_output=use_complex,
+        laplacian_method=laplacian_method,
+        states=cfg.system.get('states', 0),
+        state_specific=(cfg.optim.objective == 'vmc_overlap'),
+        pp_type=cfg.system.get('pp', {'type': 'ccecp'}).get('type'),
+        pp_symbols=pp_symbols if cfg.system.get('use_pp') else None,
+        lattice_vectors=cfg.system.pbc.lattice_vectors,
+        convergence_radius=cfg.system.pbc.convergence_radius)
 
   if cfg.optim.get('spin_energy', 0.0) > 0.0:
     # Minimize <H + c * S^2> instead of just <H>

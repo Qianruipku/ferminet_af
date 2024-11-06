@@ -164,6 +164,18 @@ def default() -> ml_collections.ConfigDict:
           # If 1, compute ground state using excited state machinery. If >1,
           # compute that many excited states.
           'states': 0,
+          # Options for periodic boundary conditions
+          'pbc': {
+            # If True, apply periodic boundary conditions
+            'apply_pbc': False,
+            # Array of shape (ndim, ndim) with the lattice vectors of the simulation cell
+            'lattice_vectors': None,
+            # Number cells to use in the Ewald summation on each direction
+            'convergence_radius': 5,
+            # Minimum number of k-points in the envelope. Defaults to 
+            # the number of particles
+            'min_kpoints': None,
+          },
           # Units of *input* coords of atoms. Either 'bohr' or
           # 'angstrom'. Internally work in a.u.; positions in
           # Angstroms are converged to Bohr.
