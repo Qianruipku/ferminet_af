@@ -19,6 +19,9 @@ def get_config():
   
   # Periodic boundary conditions
   cfg.system.pbc.apply_pbc = True
+  cfg.system.pbc.lattice_vectors = jnp.eye(3)
+  cfg.system.pbc.convergence_radius = 5
+  cfg.system.pbc.min_kpoints = None
 
   # Set training hyperparameters
   cfg.batch_size = 4096
