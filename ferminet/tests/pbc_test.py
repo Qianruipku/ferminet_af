@@ -24,23 +24,31 @@ def get_config():
   cfg.system.charges = (-1., -1.)
   cfg.system.masses = (1., 1.)
   cfg.system.molecule = [system.Atom('X', (0, 0, 0))]
-  
+
   # Periodic boundary conditions
   cfg.system.pbc.apply_pbc = True
   cfg.system.pbc.lattice_vectors = jnp.eye(3) * L
   cfg.system.pbc.convergence_radius = 5
   cfg.system.pbc.min_kpoints = None
 
+  # Median clipping
+  cfg.optim.clip_median = True
+
   # Set training hyperparameters
   cfg.batch_size = 4096
   cfg.pretrain.iterations = 0
   cfg.optim.iterations = 40_000 + 10
 
+  # Use folx for the laplacian
   cfg.optim.laplacian = "folx"
 
+  # Logging and saving
   cfg.log.save_frequency = 40_000
   cfg.log.save_path = "checkpoint_training"
   cfg.log.restore_path = "checkpoint_training"
+
+  # Break if we get nans
+  cfg.debug.check_nan = True
 
   # cfg.optim.optimizer = "none"
 
