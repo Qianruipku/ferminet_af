@@ -97,7 +97,7 @@ def make_ewald_potential_3d(
 
   batch_ewald_sum = jax.vmap(ewald_sum, in_axes=(0,))
 
-  def potential(atoms: jnp.ndarray, positions: jnp.ndarray, nspins: jnp.ndarray):
+  def potential(positions: jnp.ndarray, nspins: jnp.ndarray):
     """Callable which returns the Ewald potential
 
     Args:
@@ -117,7 +117,7 @@ def make_ewald_potential_3d(
     charge_prod = all_charges[:, None] * all_charges[None, :]
     n = all_positions.shape[0]
 
-    sum_charges_squared = jnp.sum(charge_prod**2)
+    sum_charges_squared = jnp.sum(all_charges**2)
 
     # Remove diagonal elements and flatten to pass to batch_ewald_sum
     diff_pos = utils.remove_diagonal(diff_pos)
@@ -218,7 +218,7 @@ def local_energy(
     potential_energy = ewald_function(
         lattice_vectors, data.atoms, charges, particle_charges, convergence_radius
     )
-    potential = potential_energy(data.atoms, data.positions, nspins)
+    potential = potential_energy(data.positions, nspins)
     kinetic = ke(params, data)
     return potential + kinetic, None
 
