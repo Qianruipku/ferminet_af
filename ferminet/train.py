@@ -694,6 +694,18 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
     pmap_fn = constants.pmap(observable_fns['density'],
                              in_axes=(0, 0, pmap_density_axes))
     observable_fns['density'] = lambda *a, **kw: pmap_fn(*a, **kw).mean(0)
+  if cfg.observables.single_particle_density.calculate:
+    (observable_states['single_particle_density'], 
+     observable_fns['single_particle_density']) = observables.make_density(
+      cfg.system.particles,
+      cfg.system.ndim,
+      cfg.observables.single_particle_density.lim,
+      cfg.observables.single_particle_density.nbins,
+      cfg.system.pbc.apply_pbc,
+      cfg.system.pbc.lattice_vectors
+    )
+    single_particle_density_file = open(
+        os.path.join(ckpt_save_path, 'single_particle_density.npy'), 'ab')
 
   # Initialisation done. We now want to have different PRNG streams on each
   # device. Shard the key over devices
@@ -1028,6 +1040,8 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
         sharded_key, subkeys = kfac_jax.utils.p_split(sharded_key)
         observable_states['density'] = density_update(
             subkeys, params, data, observable_states['density'])
+      if cfg.observables.single_particle_density.calculate:
+        observable_states['single_particle_density'] = observable_data['single_particle_density']
 
       # Update MCMC move width
       mcmc_width, pmoves = mcmc.update_mcmc_width(
@@ -1074,6 +1088,8 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
             writer_kwargs[key] = obs_data
             logging_str += ', <S^2>=%03.4f'
             logging_args += obs_data,
+          elif key == 'single_particle_density':
+            pass
         logging.info(logging_str, *logging_args)
         writer.write(t, **writer_kwargs)
 
@@ -1088,6 +1104,8 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
           np.save(dipole_matrix_file, observable_data['dipole'])
       if cfg.observables.density:
         np.save(density_matrix_file, observable_data['density'])
+      if cfg.observables.single_particle_density.calculate:
+        np.save(single_particle_density_file, observable_data['single_particle_density'])
 
       # Checkpointing
       if t % cfg.log.save_frequency == 0:
@@ -1103,3 +1121,5 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
         dipole_matrix_file.close()
     if cfg.observables.density:
       density_matrix_file.close()
+    if cfg.observables.single_particle_density.calculate:
+      single_particle_density_file.close()

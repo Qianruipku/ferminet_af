@@ -319,6 +319,11 @@ def default() -> ml_collections.ConfigDict:
           'density': False,  # density matrix
           'density_basis': 'def2-tzvpd',  # basis used for DM calculation
           'dipole': False,  # dipole moment
+          'single_particle_density': {
+            'calculate': False,
+            'lim': 10.,
+            'nbins': 256,
+          },
       },
       'debug': {
           # Check optimizer state, parameters and loss and raise an exception if
