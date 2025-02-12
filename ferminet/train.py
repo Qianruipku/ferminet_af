@@ -1108,7 +1108,8 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
         np.save(single_particle_density_file, observable_data['single_particle_density'])
 
       # Checkpointing
-      if t % cfg.log.save_frequency == 0:
+      if t % cfg.log.save_frequency == 0 and t != 0:
+        writer.flush()
         checkpoint.save(ckpt_save_path, t, data, params, opt_state, mcmc_width)
         time_of_last_ckpt = time.time()
 
